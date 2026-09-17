@@ -1,0 +1,33 @@
+import Sidebar from "@/components/dashboard/Sidebar";
+import TopBar from "@/components/dashboard/TopBar";
+import AnalyticsHero from "@/components/analytics/AnalyticsHero";
+import WorshipScore from "@/components/analytics/WorshipScore";
+import WeeklyAnalytics from "@/components/analytics/WeeklyAnalytics";
+import WeeklyChart from "@/components/analytics/WeeklyChart";
+import Heatmap from "@/components/analytics/Heatmap";
+import PrayerVsQuran from "@/components/analytics/PrayerVsQuran";
+import Insights from "@/components/analytics/Insights";
+import AchievementCard from "@/components/analytics/AchievementCard";
+import RecentActivity from "@/components/analytics/RecentActivity";
+import StreakOverview from "@/components/analytics/StreakOverview";
+
+export default function AnalyticsPage() {
+  return (
+    <main className="flex min-h-screen bg-[#030712]">
+      <Sidebar />
+      <div className="flex flex-1 flex-col">
+        <TopBar />
+        <div className="space-y-8 p-8">
+          <AnalyticsHero />
+          <WorshipScore />
+          <WeeklyAnalytics />
+          <WeeklyChart />
+          <PrayerVsQuran />
+          <Heatmap />
+
+          <StreakOverview />
+        </div>
+      </div>
+    </main>
+  );
+}

@@ -2,6 +2,17 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+## Firebase setup
+
+This app now uses Firebase Authentication and Cloud Firestore for personal data. To enable it:
+
+1. Create a project in the [Firebase console](https://console.firebase.google.com/), add a **Web app**, and enable **Authentication → Email/Password** and **Firestore Database**.
+2. Copy `.env.example` to `.env.local` and replace every placeholder with the Web app configuration Firebase gives you. Do not commit `.env.local`.
+3. In Firestore → Rules, publish the contents of `firestore.rules`. These rules ensure each signed-in user can only read and write their own data.
+4. Restart `npm run dev`, then visit `/auth` to create an account. The Charity dashboard will persist data in `users/{uid}/charity`.
+
+The older `app/api/**/routes.ts` files are not active Next.js route handlers (the required filename is `route.ts`) and are not used by the secure Firestore integration.
+
 First, run the development server:
 
 ```bash
