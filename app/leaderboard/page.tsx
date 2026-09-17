@@ -68,7 +68,7 @@ export default function LeaderboardPage() {
       setError("");
 
       const leaderboard =
-        await getLeaderboardUsers(100);
+        await getLeaderboardUsers();
 
       setUsers(leaderboard);
     } catch (error) {
