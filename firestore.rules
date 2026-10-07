@@ -3,48 +3,112 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // =========================================================
+    // USERNAMES
+    // =========================================================
+
     match /usernames/{username} {
+      // Anyone can check whether a username exists.
       allow get: if true;
+
+      // Prevent username enumeration through list queries.
       allow list: if false;
 
+      // User can claim a username only for their own account.
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.username == username;
 
+      // Username records cannot be modified or deleted from client.
       allow update, delete: if false;
     }
 
+
+    // =========================================================
+    // USERS
+    // =========================================================
+
     match /users/{userId} {
 
-      allow read: if request.auth != null;
+      // Users can read their own profile/data document.
+      allow read: if request.auth != null
+        && request.auth.uid == userId;
 
+      // User can create their own profile.
       allow create: if request.auth != null
         && request.auth.uid == userId;
 
+      // User can update their own profile.
       allow update: if request.auth != null
         && request.auth.uid == userId;
 
+      // User profiles cannot be deleted from the client.
       allow delete: if false;
+
+
+      // =======================================================
+      // PRAYERS
+      // =======================================================
 
       match /prayers/{date} {
         allow read, write: if request.auth != null
           && request.auth.uid == userId;
       }
 
+
+      // =======================================================
+      // QURAN DAILY READING
+      // =======================================================
+
       match /quran/{date} {
         allow read, write: if request.auth != null
           && request.auth.uid == userId;
       }
+
+
+      // =======================================================
+      // QURAN & DHIKR TEMPLATES
+      // =======================================================
+
+      match /quranTemplates/{templateId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+
+      // =======================================================
+      // QURAN & DHIKR TEMPLATE COMPLETIONS
+      // =======================================================
+
+      match /quranTemplateCompletions/{completionId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+
+      // =======================================================
+      // GOALS
+      // =======================================================
 
       match /goals/{goalId} {
         allow read, write: if request.auth != null
           && request.auth.uid == userId;
       }
 
+
+      // =======================================================
+      // GOAL COMPLETIONS
+      // =======================================================
+
       match /goalCompletions/{completionId} {
         allow read, write: if request.auth != null
           && request.auth.uid == userId;
       }
+
+
+      // =======================================================
+      // CHARITY
+      // =======================================================
 
       match /charity/{recordId} {
         allow read, write: if request.auth != null
