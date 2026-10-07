@@ -8,11 +8,20 @@ import {
 
 import { db } from "@/lib/firebase";
 
-import type {
-  GoalCategory,
-  GoalPeriod,
-  GoalTrackingType,
-  GoalUnit,
+import {
+  getDailyPrayerLog,
+} from "@/lib/prayers";
+
+import {
+  getDailyQuranLog,
+} from "@/lib/quran";
+
+import {
+  fardPrayerNames,
+  type GoalCategory,
+  type GoalPeriod,
+  type GoalTrackingType,
+  type GoalUnit,
 } from "@/lib/types";
 
 /*
@@ -42,43 +51,54 @@ export interface UserGoal {
   period: GoalPeriod;
 
   trackingType: GoalTrackingType;
-
   trackingMode: GoalTrackingMode;
 
   target: number;
-
   unit: GoalUnit;
 
   createdAt: number;
   updatedAt: number;
 
   active: boolean;
+
+  /*
+   * Manual progress storage.
+   *
+   * The value is reused for the current
+   * daily / weekly / monthly period.
+   */
+  manualProgress?: number;
+  manualProgressDate?: string;
+  manualProgressWeek?: string;
+  manualProgressMonth?: string;
 }
 
 /*
  * ==========================================
  * GOAL COMPLETION
  * ==========================================
- *
- * Stored at:
- *
- * users/{userId}/goalCompletions/{completionId}
- *
- * A completion represents one successfully
- * completed goal occurrence.
  */
 
 export interface GoalCompletion {
   id: string;
   userId: string;
   goalId: string;
-
   completedAt: number;
-
-  /*
-   * daily / weekly / monthly / custom
-   */
   period: GoalPeriod;
+}
+
+/*
+ * ==========================================
+ * GOAL PROGRESS
+ * ==========================================
+ */
+
+export interface GoalProgress {
+  goalId: string;
+  progress: number;
+  target: number;
+  percentage: number;
+  completed: boolean;
 }
 
 /*
@@ -101,19 +121,15 @@ export interface GoalStats {
 
 export type CreateGoalInput = {
   title: string;
-
   description?: string;
 
   category: GoalCategory;
-
   period: GoalPeriod;
 
   trackingType: GoalTrackingType;
-
   trackingMode: GoalTrackingMode;
 
   target: number;
-
   unit: GoalUnit;
 
   active?: boolean;
@@ -149,6 +165,162 @@ function goalCompletionsCollection(
 
 /*
  * ==========================================
+ * DATE HELPERS
+ * ==========================================
+ */
+
+function getLocalDate(
+  date = new Date()
+): string {
+  const year =
+    date.getFullYear();
+
+  const month =
+    String(
+      date.getMonth() + 1
+    ).padStart(2, "0");
+
+  const day =
+    String(
+      date.getDate()
+    ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getWeekKey(
+  date = new Date()
+): string {
+  const weekStart =
+    new Date(date);
+
+  const day =
+    weekStart.getDay();
+
+  const diff =
+    day === 0
+      ? -6
+      : 1 - day;
+
+  weekStart.setDate(
+    weekStart.getDate() + diff
+  );
+
+  return getLocalDate(
+    weekStart
+  );
+}
+
+function getMonthKey(
+  date = new Date()
+): string {
+  return [
+    date.getFullYear(),
+    String(
+      date.getMonth() + 1
+    ).padStart(2, "0"),
+  ].join("-");
+}
+
+/*
+ * ==========================================
+ * PERIOD DATES
+ * ==========================================
+ */
+
+function getPeriodDates(
+  period: GoalPeriod
+): string[] {
+  const today =
+    new Date();
+
+  const dates: string[] = [];
+
+  /*
+   * Daily
+   */
+
+  if (period === "daily") {
+    return [
+      getLocalDate(today),
+    ];
+  }
+
+  /*
+   * Weekly
+   *
+   * Monday -> today
+   */
+
+  if (period === "weekly") {
+    const day =
+      today.getDay();
+
+    const mondayOffset =
+      day === 0
+        ? -6
+        : 1 - day;
+
+    const monday =
+      new Date(today);
+
+    monday.setDate(
+      today.getDate() +
+        mondayOffset
+    );
+
+    const current =
+      new Date(monday);
+
+    while (
+      current <= today
+    ) {
+      dates.push(
+        getLocalDate(current)
+      );
+
+      current.setDate(
+        current.getDate() + 1
+      );
+    }
+
+    return dates;
+  }
+
+  /*
+   * Monthly
+   *
+   * First day of current month
+   * -> today
+   */
+
+  const firstDay =
+    new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      1
+    );
+
+  const current =
+    new Date(firstDay);
+
+  while (
+    current <= today
+  ) {
+    dates.push(
+      getLocalDate(current)
+    );
+
+    current.setDate(
+      current.getDate() + 1
+    );
+  }
+
+  return dates;
+}
+
+/*
+ * ==========================================
  * CREATE GOAL
  * ==========================================
  */
@@ -157,28 +329,31 @@ export async function createGoal(
   userId: string,
   input: CreateGoalInput
 ): Promise<UserGoal> {
-  const goalRef = doc(
-    goalsCollection(userId)
-  );
+  const goalRef =
+    doc(
+      goalsCollection(userId)
+    );
 
-  const now = Date.now();
+  const now =
+    Date.now();
 
   const goal: UserGoal = {
-  id: goalRef.id,
+    id: goalRef.id,
 
-  userId,
+    userId,
 
-  title: input.title,
+    title:
+      input.title,
 
-  ...(input.description?.trim()
-    ? {
-        description:
-          input.description.trim(),
-      }
-    : {}),
+    ...(input.description?.trim()
+      ? {
+          description:
+            input.description.trim(),
+        }
+      : {}),
 
-  category:
-    input.category,
+    category:
+      input.category,
 
     period:
       input.period,
@@ -290,6 +465,30 @@ export async function getUserGoals(
           "boolean"
             ? data.active
             : true,
+
+        manualProgress:
+          typeof data.manualProgress ===
+          "number"
+            ? data.manualProgress
+            : 0,
+
+        manualProgressDate:
+          typeof data.manualProgressDate ===
+          "string"
+            ? data.manualProgressDate
+            : undefined,
+
+        manualProgressWeek:
+          typeof data.manualProgressWeek ===
+          "string"
+            ? data.manualProgressWeek
+            : undefined,
+
+        manualProgressMonth:
+          typeof data.manualProgressMonth ===
+          "string"
+            ? data.manualProgressMonth
+            : undefined,
       };
     }
   );
@@ -305,24 +504,99 @@ export async function saveUserGoal(
   userId: string,
   goal: UserGoal
 ): Promise<void> {
-  const goalRef = doc(
-    db,
-    "users",
-    userId,
-    "goals",
-    goal.id
-  );
+  const goalRef =
+    doc(
+      db,
+      "users",
+      userId,
+      "goals",
+      goal.id
+    );
 
   await setDoc(
     goalRef,
     {
       ...goal,
-
       userId,
-
       updatedAt:
         Date.now(),
     },
+    {
+      merge: true,
+    }
+  );
+}
+
+/*
+ * ==========================================
+ * UPDATE MANUAL PROGRESS
+ * ==========================================
+ */
+
+export async function updateManualGoalProgress(
+  userId: string,
+  goal: UserGoal,
+  progress: number
+): Promise<void> {
+  const goalRef =
+    doc(
+      db,
+      "users",
+      userId,
+      "goals",
+      goal.id
+    );
+
+  const now =
+    new Date();
+
+  const safeProgress =
+    Math.max(
+      0,
+      Math.min(
+        progress,
+        goal.target
+      )
+    );
+
+  const data: Record<
+    string,
+    unknown
+  > = {
+    manualProgress:
+      safeProgress,
+
+    updatedAt:
+      Date.now(),
+  };
+
+  if (
+    goal.period ===
+    "daily"
+  ) {
+    data.manualProgressDate =
+      getLocalDate(now);
+  }
+
+  if (
+    goal.period ===
+    "weekly"
+  ) {
+    data.manualProgressWeek =
+      getWeekKey(now);
+  }
+
+  if (
+    goal.period ===
+    "monthly"
+  ) {
+    data.manualProgressMonth =
+      getMonthKey(now);
+  }
+
+  await setDoc(
+    goalRef,
+    data,
     {
       merge: true,
     }
@@ -354,12 +628,6 @@ export async function deleteUserGoal(
  * ==========================================
  * RECORD GOAL COMPLETION
  * ==========================================
- *
- * Call this when a goal becomes completed.
- *
- * IMPORTANT:
- * The completion document ID is generated
- * automatically by Firestore.
  */
 
 export async function recordGoalCompletion(
@@ -367,12 +635,17 @@ export async function recordGoalCompletion(
   goalId: string,
   period: GoalPeriod
 ): Promise<GoalCompletion> {
-  const completionRef = doc(
-    goalCompletionsCollection(userId)
-  );
+  const completionRef =
+    doc(
+      goalCompletionsCollection(
+        userId
+      )
+    );
 
-  const completion: GoalCompletion = {
-    id: completionRef.id,
+  const completion:
+    GoalCompletion = {
+    id:
+      completionRef.id,
 
     userId,
 
@@ -403,7 +676,9 @@ export async function getGoalCompletions(
 ): Promise<GoalCompletion[]> {
   const snapshot =
     await getDocs(
-      goalCompletionsCollection(userId)
+      goalCompletionsCollection(
+        userId
+      )
     );
 
   return snapshot.docs
@@ -442,32 +717,317 @@ export async function getGoalCompletions(
 
 /*
  * ==========================================
+ * AUTOMATIC DAILY ACTIVITY
+ * ==========================================
+ */
+
+async function getAutomaticDailyProgress(
+  userId: string,
+  goal: UserGoal,
+  date: string
+): Promise<number> {
+
+  /*
+   * Prayer
+   */
+
+  if (
+    goal.trackingType ===
+    "prayer"
+  ) {
+    const prayerLog =
+      await getDailyPrayerLog(
+        userId,
+        date
+      );
+
+    return fardPrayerNames.filter(
+      (prayer) =>
+        prayerLog.fard[
+          prayer
+        ] === true
+    ).length;
+  }
+
+  /*
+   * Quran pages
+   */
+
+  if (
+    goal.trackingType ===
+    "quran_pages"
+  ) {
+    const quranLog =
+      await getDailyQuranLog(
+        userId,
+        date
+      );
+
+    return Math.max(
+      0,
+      quranLog.pagesRead
+    );
+  }
+
+  /*
+   * Other automatic types
+   *
+   * These can be connected later
+   * when their activity modules
+   * expose daily progress.
+   */
+
+  return 0;
+}
+
+/*
+ * ==========================================
+ * AUTOMATIC GOAL PROGRESS
+ * ==========================================
+ */
+
+async function getAutomaticGoalProgress(
+  userId: string,
+  goal: UserGoal
+): Promise<number> {
+  const dates =
+    getPeriodDates(
+      goal.period
+    );
+
+  const dailyProgress =
+    await Promise.all(
+      dates.map(
+        (date) =>
+          getAutomaticDailyProgress(
+            userId,
+            goal,
+            date
+          )
+      )
+    );
+
+  return dailyProgress.reduce(
+    (
+      total,
+      value
+    ) =>
+      total + value,
+    0
+  );
+}
+
+/*
+ * ==========================================
+ * MANUAL GOAL PROGRESS
+ * ==========================================
+ */
+
+function getManualGoalProgress(
+  goal: UserGoal
+): number {
+  const now =
+    new Date();
+
+  /*
+   * Daily
+   */
+
+  if (
+    goal.period ===
+    "daily"
+  ) {
+    if (
+      goal.manualProgressDate !==
+      getLocalDate(now)
+    ) {
+      return 0;
+    }
+
+    return Math.max(
+      0,
+      goal.manualProgress ?? 0
+    );
+  }
+
+  /*
+   * Weekly
+   */
+
+  if (
+    goal.period ===
+    "weekly"
+  ) {
+    if (
+      goal.manualProgressWeek !==
+      getWeekKey(now)
+    ) {
+      return 0;
+    }
+
+    return Math.max(
+      0,
+      goal.manualProgress ?? 0
+    );
+  }
+
+  /*
+   * Monthly
+   */
+
+  if (
+    goal.period ===
+    "monthly"
+  ) {
+    if (
+      goal.manualProgressMonth !==
+      getMonthKey(now)
+    ) {
+      return 0;
+    }
+
+    return Math.max(
+      0,
+      goal.manualProgress ?? 0
+    );
+  }
+
+  return 0;
+}
+
+/*
+ * ==========================================
+ * GET GOAL PROGRESS
+ * ==========================================
+ */
+
+export async function getGoalProgress(
+  userId: string,
+  goal: UserGoal
+): Promise<GoalProgress> {
+  let progress = 0;
+
+  /*
+   * Automatic
+   */
+
+  if (
+    goal.trackingMode ===
+    "automatic"
+  ) {
+    progress =
+      await getAutomaticGoalProgress(
+        userId,
+        goal
+      );
+  }
+
+  /*
+   * Manual
+   */
+
+  if (
+    goal.trackingMode ===
+    "manual"
+  ) {
+    progress =
+      getManualGoalProgress(
+        goal
+      );
+  }
+
+  const target =
+    Math.max(
+      1,
+      goal.target
+    );
+
+  const safeProgress =
+    Math.min(
+      Math.max(
+        0,
+        progress
+      ),
+      target
+    );
+
+  const percentage =
+    Math.min(
+      100,
+      Math.round(
+        (safeProgress /
+          target) *
+          100
+      )
+    );
+
+  return {
+    goalId:
+      goal.id,
+
+    progress:
+      safeProgress,
+
+    target,
+
+    percentage,
+
+    completed:
+      safeProgress >= target,
+  };
+}
+
+/*
+ * ==========================================
+ * GET ALL GOAL PROGRESS
+ * ==========================================
+ */
+
+export async function getAllGoalProgress(
+  userId: string,
+  goals: UserGoal[]
+): Promise<
+  Record<
+    string,
+    GoalProgress
+  >
+> {
+  const results =
+    await Promise.all(
+      goals.map(
+        async (goal) => {
+          const progress =
+            await getGoalProgress(
+              userId,
+              goal
+            );
+
+          return [
+            goal.id,
+            progress,
+          ] as const;
+        }
+      )
+    );
+
+  return Object.fromEntries(
+    results
+  );
+}
+
+/*
+ * ==========================================
  * GET GOAL STATISTICS
  * ==========================================
- *
- * Active Goals:
- *   Number of currently active goals.
- *
- * Completed:
- *   Number of valid completion records
- *   belonging to the user's goals.
- *
- * Success Rate:
- *   completed / active * 100
- *
- * The result is capped at 100%.
  */
 
 export async function getUserGoalStats(
   userId: string
 ): Promise<GoalStats> {
-  const [
-    goals,
-    completions,
-  ] = await Promise.all([
-    getUserGoals(userId),
-    getGoalCompletions(userId),
-  ]);
+  const goals =
+    await getUserGoals(
+      userId
+    );
 
   const activeGoals =
     goals.filter(
@@ -475,50 +1035,45 @@ export async function getUserGoalStats(
         goal.active === true
     );
 
-  const activeGoalIds =
-    new Set(
+  if (
+    activeGoals.length === 0
+  ) {
+    return {
+      activeGoals: 0,
+      completedGoals: 0,
+      successRate: 0,
+    };
+  }
+
+  const progressResults =
+    await Promise.all(
       activeGoals.map(
         (goal) =>
-          goal.id
+          getGoalProgress(
+            userId,
+            goal
+          )
       )
     );
 
-  /*
-   * Only count completion records for
-   * goals that still belong to the user.
-   */
-  const validCompletions =
-    completions.filter(
-      (completion) =>
-        activeGoalIds.has(
-          completion.goalId
-        )
-    );
-
-  const activeCount =
-    activeGoals.length;
-
-  const completedCount =
-    validCompletions.length;
+  const completedGoals =
+    progressResults.filter(
+      (progress) =>
+        progress.completed
+    ).length;
 
   const successRate =
-    activeCount === 0
-      ? 0
-      : Math.min(
-          100,
-          Math.round(
-            (completedCount /
-              activeCount) *
-              100
-          )
-        );
+    Math.round(
+      (completedGoals /
+        activeGoals.length) *
+        100
+    );
 
   return {
     activeGoals:
-      activeCount,
+      activeGoals.length,
 
-    completedGoals:
-      completedCount,
+    completedGoals,
 
     successRate,
   };

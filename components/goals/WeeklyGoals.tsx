@@ -8,9 +8,16 @@ import ProgressBar from "@/components/ui/ProgressBar";
 import SectionHeader from "@/components/ui/SectionHeader";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserGoals } from "@/lib/goals";
 
-import type { UserGoal } from "@/lib/types";
+import {
+  getGoalProgress,
+  getUserGoals,
+} from "@/lib/goals";
+
+import type {
+  UserGoal,
+  GoalProgress,
+} from "@/lib/goals";
 
 export default function WeeklyGoals() {
   const {
@@ -20,6 +27,11 @@ export default function WeeklyGoals() {
 
   const [goals, setGoals] =
     useState<UserGoal[]>([]);
+
+  const [progress, setProgress] =
+    useState<
+      Record<string, GoalProgress>
+    >({});
 
   const [loading, setLoading] =
     useState(true);
@@ -31,6 +43,7 @@ export default function WeeklyGoals() {
     useCallback(async () => {
       if (!user) {
         setGoals([]);
+        setProgress({});
         setLoading(false);
         return;
       }
@@ -40,7 +53,9 @@ export default function WeeklyGoals() {
         setError(null);
 
         const allGoals =
-          await getUserGoals(user.uid);
+          await getUserGoals(
+            user.uid
+          );
 
         const weeklyGoals =
           allGoals.filter(
@@ -49,7 +64,33 @@ export default function WeeklyGoals() {
               goal.period === "weekly"
           );
 
-        setGoals(weeklyGoals);
+        const progressEntries =
+          await Promise.all(
+            weeklyGoals.map(
+              async (goal) => {
+                const result =
+                  await getGoalProgress(
+                    user.uid,
+                    goal
+                  );
+
+                return [
+                  goal.id,
+                  result,
+                ] as const;
+              }
+            )
+          );
+
+        setGoals(
+          weeklyGoals
+        );
+
+        setProgress(
+          Object.fromEntries(
+            progressEntries
+          )
+        );
       } catch (error) {
         console.error(
           "Could not load weekly goals:",
@@ -64,9 +105,9 @@ export default function WeeklyGoals() {
       }
     }, [user]);
 
-  /* =====================================================
-     INITIAL LOAD
-  ===================================================== */
+  /*
+   * INITIAL LOAD
+   */
 
   useEffect(() => {
     if (authLoading) {
@@ -79,9 +120,9 @@ export default function WeeklyGoals() {
     loadWeeklyGoals,
   ]);
 
-  /* =====================================================
-     REFRESH AFTER GOAL CREATION / UPDATE
-  ===================================================== */
+  /*
+   * REFRESH AFTER GOAL UPDATE
+   */
 
   useEffect(() => {
     function handleGoalsUpdate() {
@@ -93,9 +134,29 @@ export default function WeeklyGoals() {
       handleGoalsUpdate
     );
 
+    window.addEventListener(
+      "prayer-data-updated",
+      handleGoalsUpdate
+    );
+
+    window.addEventListener(
+      "quran-data-updated",
+      handleGoalsUpdate
+    );
+
     return () => {
       window.removeEventListener(
         "goals-data-updated",
+        handleGoalsUpdate
+      );
+
+      window.removeEventListener(
+        "prayer-data-updated",
+        handleGoalsUpdate
+      );
+
+      window.removeEventListener(
+        "quran-data-updated",
         handleGoalsUpdate
       );
     };
@@ -148,28 +209,40 @@ export default function WeeklyGoals() {
         {!loading &&
         !error &&
         goals.length > 0
-          ? goals.map((goal) => (
-              <div
-                key={goal.id}
-                className="rounded-2xl border border-[#172235] bg-[#081522] p-5"
-              >
-                <ProgressBar
-                  label={goal.title}
-                  value={0}
-                />
+          ? goals.map((goal) => {
+              const goalProgress =
+                progress[goal.id];
 
-                <div className="mt-2 flex justify-between text-xs text-slate-500">
-                  <span>
-                    Target: {goal.target}{" "}
-                    {goal.unit}
-                  </span>
+              const currentProgress =
+                goalProgress?.progress ?? 0;
 
-                  <span>
-                    0 / {goal.target}
-                  </span>
+              const percentage =
+                goalProgress?.percentage ?? 0;
+
+              return (
+                <div
+                  key={goal.id}
+                  className="rounded-2xl border border-[#172235] bg-[#081522] p-5"
+                >
+                  <ProgressBar
+                    label={goal.title}
+                    value={percentage}
+                  />
+
+                  <div className="mt-2 flex justify-between text-xs text-slate-500">
+                    <span>
+                      Target: {goal.target}{" "}
+                      {goal.unit}
+                    </span>
+
+                    <span>
+                      {currentProgress} /{" "}
+                      {goal.target}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           : null}
       </div>
     </DashboardCard>
