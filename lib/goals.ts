@@ -164,17 +164,21 @@ export async function createGoal(
   const now = Date.now();
 
   const goal: UserGoal = {
-    id: goalRef.id,
+  id: goalRef.id,
 
-    userId,
+  userId,
 
-    title: input.title,
+  title: input.title,
 
-    description:
-      input.description,
+  ...(input.description?.trim()
+    ? {
+        description:
+          input.description.trim(),
+      }
+    : {}),
 
-    category:
-      input.category,
+  category:
+    input.category,
 
     period:
       input.period,
