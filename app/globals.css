@@ -143,19 +143,24 @@ body {
     var(--background);
 }
 
-section{
-  padding-top:96px;
-  padding-bottom:96px;
-}
-
-html{
-  scroll-behavior:smooth;
-}
-section {
-  padding-top: 96px;
-  padding-bottom: 96px;
-}
-
 html {
   scroll-behavior: smooth;
+}
+
+section {
+  padding-block: 96px;
+}
+
+/* Tablets */
+@media (max-width: 1024px) {
+  section {
+    padding-block: 64px;
+  }
+}
+
+/* Mobile phones */
+@media (max-width: 640px) {
+  section {
+    padding-block: 40px;
+  }
 }
