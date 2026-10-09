@@ -164,6 +164,20 @@ export async function registerUser(
     }
   );
 
+  // Create the user's public leaderboard entry.
+  await setDoc(
+    doc(db, "leaderboard", user.uid),
+    {
+      uid: user.uid,
+      name: cleanName,
+      username: cleanUsername,
+      points: 0,
+      prayerPoints: 0,
+      quranPoints: 0,
+      charityPoints: 0,
+    }
+  );
+
   /*
    * Reserve the username.
    *

@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -14,7 +15,7 @@ service cloud.firestore {
       // Prevent username enumeration through list queries.
       allow list: if false;
 
-      // User can claim a username only for their own account.
+      // Users can claim a username only for their own account.
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.username == username;
@@ -23,28 +24,60 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // =========================================================
+    // PUBLIC LEADERBOARD
+    // =========================================================
+
+    match /leaderboard/{userId} {
+
+      // Authenticated users can view leaderboard entries.
+      allow read: if request.auth != null;
+
+      // Users can create or update only their own entry.
+      // Only the specified public fields are permitted.
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          "uid",
+          "name",
+          "username",
+          "points",
+          "prayerPoints",
+          "quranPoints",
+          "charityPoints"
+        ])
+        && request.resource.data.uid == userId
+        && request.resource.data.name is string
+        && request.resource.data.username is string
+        && request.resource.data.points is number
+        && request.resource.data.prayerPoints is number
+        && request.resource.data.quranPoints is number
+        && request.resource.data.charityPoints is number;
+
+      // Entries cannot be deleted from the client.
+      allow delete: if false;
+    }
 
     // =========================================================
-    // USERS
+    // USERS — PRIVATE USER DATA
     // =========================================================
 
     match /users/{userId} {
 
-      // Users can read their own profile/data document.
+      // Users can read only their own profile/data document.
       allow read: if request.auth != null
         && request.auth.uid == userId;
 
-      // User can create their own profile.
+      // Users can create their own profile.
       allow create: if request.auth != null
         && request.auth.uid == userId;
 
-      // User can update their own profile.
+      // Users can update their own profile.
       allow update: if request.auth != null
         && request.auth.uid == userId;
 
       // User profiles cannot be deleted from the client.
       allow delete: if false;
-
 
       // =======================================================
       // PRAYERS
@@ -55,7 +88,6 @@ service cloud.firestore {
           && request.auth.uid == userId;
       }
 
-
       // =======================================================
       // QURAN DAILY READING
       // =======================================================
@@ -64,7 +96,6 @@ service cloud.firestore {
         allow read, write: if request.auth != null
           && request.auth.uid == userId;
       }
-
 
       // =======================================================
       // QURAN & DHIKR TEMPLATES
@@ -75,7 +106,6 @@ service cloud.firestore {
           && request.auth.uid == userId;
       }
 
-
       // =======================================================
       // QURAN & DHIKR TEMPLATE COMPLETIONS
       // =======================================================
@@ -84,7 +114,6 @@ service cloud.firestore {
         allow read, write: if request.auth != null
           && request.auth.uid == userId;
       }
-
 
       // =======================================================
       // GOALS
@@ -95,7 +124,6 @@ service cloud.firestore {
           && request.auth.uid == userId;
       }
 
-
       // =======================================================
       // GOAL COMPLETIONS
       // =======================================================
@@ -104,7 +132,6 @@ service cloud.firestore {
         allow read, write: if request.auth != null
           && request.auth.uid == userId;
       }
-
 
       // =======================================================
       // CHARITY

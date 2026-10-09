@@ -6,31 +6,16 @@ import {
 import { db } from "@/lib/firebase";
 import type { LeaderboardUser } from "@/lib/types";
 
-/**
- * Get all users that are eligible to appear
- * on the global leaderboard.
- *
- * IMPORTANT:
- * This version intentionally does not use
- * orderBy() or limit().
- *
- * We are first verifying that Firestore allows
- * authenticated users to read the users collection.
- */
 export async function getLeaderboardUsers(): Promise<
   LeaderboardUser[]
 > {
-  console.log("🔥 Starting leaderboard query...");
+  const leaderboardCollection = collection(
+    db,
+    "leaderboard"
+  );
 
-  const usersCollection = collection(db, "users");
-
-  console.log("🔥 Users collection created.");
-
-  const snapshot = await getDocs(usersCollection);
-
-  console.log(
-    "🔥 Users successfully loaded:",
-    snapshot.size
+  const snapshot = await getDocs(
+    leaderboardCollection
   );
 
   const users: LeaderboardUser[] = snapshot.docs.map(
@@ -73,13 +58,7 @@ export async function getLeaderboardUsers(): Promise<
     }
   );
 
-  /*
-   * Sort locally for this testing stage.
-   *
-   * Once Firestore permissions are confirmed,
-   * we can move the sorting into the Firestore
-   * query using orderBy().
-   */
+  // Sort by total points, highest first.
   users.sort((a, b) => b.points - a.points);
 
   return users;
