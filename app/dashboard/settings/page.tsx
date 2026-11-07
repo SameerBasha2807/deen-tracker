@@ -1,13 +1,13 @@
-import Sidebar from "@/components/dashboard/Sidebar";
-import TopBar from "@/components/dashboard/TopBar";
+import Sidebar from "@/app/components/dashboard/Sidebar";
+import TopBar from "@/app/components/dashboard/TopBar";
 
-import SettingsHero from "@/components/settings/SettingsHero";
-import AccountSettings from "@/components/settings/AccountSettings";
-import PrayerSettings from "@/components/settings/PrayerSettings";
-import NotificationSettings from "@/components/settings/NotificationSettings";
-import QuranSettings from "@/components/settings/QuranSettings";
-import AppearanceSettings from "@/components/settings/AppearanceSettings";
-import PrivacySettings from "@/components/settings/PrivacySettings";
+import SettingsHero from "@/app/components/settings/SettingsHero";
+import AccountSettings from "@/app/components/settings/AccountSettings";
+import PrayerSettings from "@/app/components/settings/PrayerSettings";
+import NotificationSettings from "@/app/components/settings/NotificationSettings";
+import QuranSettings from "@/app/components/settings/QuranSettings";
+import AppearanceSettings from "@/app/components/settings/AppearanceSettings";
+import PrivacySettings from "@/app/components/settings/PrivacySettings";
 
 export default function SettingsPage() {
   return (

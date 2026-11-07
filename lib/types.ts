@@ -1,3 +1,4 @@
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -42,6 +43,7 @@ export const voluntaryPrayerNames = [
   "witr",
   "tahajjud",
   "ishraq",
+  "duha",
   "tawbah",
 ] as const;
 
@@ -169,21 +171,13 @@ export type GoalUnit =
 
 export interface UserGoal {
   id: string;
-
   userId: string;
-
   title: string;
-
   category: GoalCategory;
-
   period: GoalPeriod;
-
   trackingType: GoalTrackingType;
-
   trackingMode: GoalTrackingMode;
-
   unit: GoalUnit;
-
   target: number;
 
   /*
@@ -198,7 +192,6 @@ export interface UserGoal {
    * YYYY-MM-DD
    */
   startDate?: string;
-
   endDate?: string;
 
   /*
@@ -208,7 +201,6 @@ export interface UserGoal {
   active: boolean;
 
   createdAt: number;
-
   updatedAt: number;
 }
 
@@ -218,11 +210,8 @@ export interface UserGoal {
 
 export interface CharityRecord {
   id?: string;
-
   userId: string;
-
   amount: number;
-
   date: string; // YYYY-MM-DD
 
   category:
@@ -233,19 +222,14 @@ export interface CharityRecord {
     | "other";
 
   note?: string;
-
   createdAt: number;
 }
 
 export interface CharityMath {
   today: number;
-
   thisWeek: number;
-
   thisMonth: number;
-
   thisYear: number;
-
   allTime: number;
 
   dailyHistory: {
@@ -253,6 +237,7 @@ export interface CharityMath {
     total: number;
   }[];
 }
+
 /* =====================================================
    LEADERBOARD
 ===================================================== */
@@ -264,24 +249,5 @@ export interface LeaderboardUser {
   points: number;
   prayerPoints: number;
   quranPoints: number;
-  charityPoints: number;
-}
-/* =====================================================
-   LEADERBOARD
-===================================================== */
-
-export interface LeaderboardUser {
-  uid: string;
-
-  username: string;
-
-  name: string;
-
-  points: number;
-
-  prayerPoints: number;
-
-  quranPoints: number;
-
   charityPoints: number;
 }

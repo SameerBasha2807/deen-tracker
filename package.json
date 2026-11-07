@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --experimental-https --experimental-https-key ./certificates/deentracker-key.pem --experimental-https-cert ./certificates/deentracker.pem",
+    "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

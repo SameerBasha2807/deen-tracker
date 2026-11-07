@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import Navbar from "@/components/layout/Navbar";
-import Features from "@/components/landing/Features";
+import Navbar from "@/app/components/layout/Navbar";
+import Features from "@/app/components/landing/Features";
 
 export default function FeaturesPage() {
   return (

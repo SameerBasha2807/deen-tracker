@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Sidebar from "@/components/dashboard/Sidebar";
-import TopBar from "@/components/dashboard/TopBar";
-import CharityTracker from "@/components/charity/CharityTracker";
+import Sidebar from "@/app/components/dashboard/Sidebar";
+import TopBar from "@/app/components/dashboard/TopBar";
+import CharityTracker from "@/app/components/charity/CharityTracker";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function CharityPage() {

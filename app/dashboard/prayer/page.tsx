@@ -1,7 +1,7 @@
-import Sidebar from "@/components/dashboard/Sidebar";
-import TopBar from "@/components/dashboard/TopBar";
+import Sidebar from "@/app/components/dashboard/Sidebar";
+import TopBar from "@/app/components/dashboard/TopBar";
 
-import DailyPrayerTracker from "@/components/prayer/DailyPrayerTracker";
+import DailyPrayerTracker from "@/app/components/prayer/DailyPrayerTracker";
 
 export default function PrayerPage() {
   return (

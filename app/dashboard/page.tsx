@@ -1,10 +1,11 @@
-import Sidebar from "@/components/dashboard/Sidebar";
-import TopBar from "@/components/dashboard/TopBar";
-import DashboardHero from "@/components/dashboard/DashboardHero";
-import TodaysOverview from "@/components/dashboard/TodaysOverview";
-import QuickActions from "@/components/dashboard/QuickActions";
-import UpcomingPrayer from "@/components/dashboard/UpcomingPrayer";
-import WeeklySummary from "@/components/dashboard/WeeklySummary";
+import Sidebar from "@/app/components/dashboard/Sidebar";
+import TopBar from "@/app/components/dashboard/TopBar";
+import DashboardHero from "@/app/components/dashboard/DashboardHero";
+import WuduTracker from "@/app/components/dashboard/WuduTracker-temp";
+import TodaysOverview from "@/app/components/dashboard/TodaysOverview";
+import QuickActions from "@/app/components/dashboard/QuickActions";
+import UpcomingPrayer from "@/app/components/dashboard/UpcomingPrayer";
+import WeeklySummary from "@/app/components/dashboard/WeeklySummary";
 
 export default function DashboardPage() {
   return (
@@ -16,13 +17,14 @@ export default function DashboardPage() {
 
         <div className="space-y-8 p-8">
           <DashboardHero />
-
+          <WuduTracker />
           <TodaysOverview />
 
           <div className="grid gap-8 xl:grid-cols-2">
             <WeeklySummary />
             <UpcomingPrayer />
           </div>
+
           <QuickActions />
         </div>
       </div>

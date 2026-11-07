@@ -7,7 +7,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import Navbar from "@/components/layout/Navbar";
+import Navbar from "@/app/components/layout/Navbar";
 
 export default function AboutPage() {
   return (

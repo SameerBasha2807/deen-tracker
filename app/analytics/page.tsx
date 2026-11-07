@@ -1,15 +1,15 @@
-import Sidebar from "@/components/dashboard/Sidebar";
-import TopBar from "@/components/dashboard/TopBar";
-import AnalyticsHero from "@/components/analytics/AnalyticsHero";
-import WorshipScore from "@/components/analytics/WorshipScore";
-import WeeklyAnalytics from "@/components/analytics/WeeklyAnalytics";
-import WeeklyChart from "@/components/analytics/WeeklyChart";
-import Heatmap from "@/components/analytics/Heatmap";
-import PrayerVsQuran from "@/components/analytics/PrayerVsQuran";
-import Insights from "@/components/analytics/Insights";
-import AchievementCard from "@/components/analytics/AchievementCard";
-import RecentActivity from "@/components/analytics/RecentActivity";
-import StreakOverview from "@/components/analytics/StreakOverview";
+import Sidebar from "@/app/components/dashboard/Sidebar";
+import TopBar from "@/app/components/dashboard/TopBar";
+import AnalyticsHero from "@/app/components/analytics/AnalyticsHero";
+import WorshipScore from "@/app/components/analytics/WorshipScore";
+import WeeklyAnalytics from "@/app/components/analytics/WeeklyAnalytics";
+import WeeklyChart from "@/app/components/analytics/WeeklyChart";
+import Heatmap from "@/app/components/analytics/Heatmap";
+import PrayerVsQuran from "@/app/components/analytics/PrayerVsQuran";
+import Insights from "@/app/components/analytics/Insights";
+import AchievementCard from "@/app/components/analytics/AchievementCard";
+import RecentActivity from "@/app/components/analytics/RecentActivity";
+import StreakOverview from "@/app/components/analytics/StreakOverview";
 
 export default function AnalyticsPage() {
   return (

@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -9,18 +8,13 @@ service cloud.firestore {
     // =========================================================
 
     match /usernames/{username} {
-      // Anyone can check whether a username exists.
       allow get: if true;
-
-      // Prevent username enumeration through list queries.
       allow list: if false;
 
-      // Users can claim a username only for their own account.
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.username == username;
 
-      // Username records cannot be modified or deleted from client.
       allow update, delete: if false;
     }
 
@@ -29,14 +23,19 @@ service cloud.firestore {
     // =========================================================
 
     match /leaderboard/{userId} {
-
-      // Authenticated users can view leaderboard entries.
       allow read: if request.auth != null;
 
-      // Users can create or update only their own entry.
-      // Only the specified public fields are permitted.
       allow create, update: if request.auth != null
         && request.auth.uid == userId
+        && request.resource.data.keys().hasAll([
+          "uid",
+          "name",
+          "username",
+          "points",
+          "prayerPoints",
+          "quranPoints",
+          "charityPoints"
+        ])
         && request.resource.data.keys().hasOnly([
           "uid",
           "name",
@@ -54,7 +53,6 @@ service cloud.firestore {
         && request.resource.data.quranPoints is number
         && request.resource.data.charityPoints is number;
 
-      // Entries cannot be deleted from the client.
       allow delete: if false;
     }
 
@@ -64,19 +62,15 @@ service cloud.firestore {
 
     match /users/{userId} {
 
-      // Users can read only their own profile/data document.
       allow read: if request.auth != null
         && request.auth.uid == userId;
 
-      // Users can create their own profile.
       allow create: if request.auth != null
         && request.auth.uid == userId;
 
-      // Users can update their own profile.
       allow update: if request.auth != null
         && request.auth.uid == userId;
 
-      // User profiles cannot be deleted from the client.
       allow delete: if false;
 
       // =======================================================
@@ -134,11 +128,818 @@ service cloud.firestore {
       }
 
       // =======================================================
+      // DAILY GOAL TEMPLATE
+      // One reusable personal template per user.
+      // =======================================================
+
+      match /dailyGoalTemplates/{templateId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId
+          && templateId == "main";
+      }
+
+      // =======================================================
+      // DAILY GOAL RECORDS
+      // One document per calendar day.
+      // Collection queries are allowed for the owner.
+      // =======================================================
+
+      match /dailyGoalRecords/{recordId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      // =======================================================
+      // WUDU TRACKER
+      // =======================================================
+
+      match /wudu/{documentId} {
+
+        allow read: if request.auth != null
+          && request.auth.uid == userId
+          && documentId == "current";
+
+        allow create, update: if request.auth != null
+          && request.auth.uid == userId
+          && documentId == "current"
+          && request.resource.data.keys().hasOnly([
+            "status",
+            "lastChangedAt",
+            "lastWuduAt",
+            "lastConfirmedAt",
+            "updatedAt"
+          ])
+          && request.resource.data.status in [
+            "in_wudu",
+            "not_in_wudu"
+          ];
+
+        allow delete: if false;
+      }
+
+      // =======================================================
       // CHARITY
       // =======================================================
 
       match /charity/{recordId} {
         allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      // =======================================================
+      // USER PREFERENCES — RAMADAN MODE
+      // =======================================================
+
+      match /preferences/{preferenceId} {
+
+        allow read: if request.auth != null
+          && request.auth.uid == userId
+          && preferenceId == "ramadan";
+
+        allow create, update: if request.auth != null
+          && request.auth.uid == userId
+          && preferenceId == "ramadan"
+          && request.resource.data.keys().hasAll([
+            "ramadanModeEnabled",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "ramadanModeEnabled",
+            "updatedAt"
+          ])
+          && request.resource.data.ramadanModeEnabled is bool
+          && request.resource.data.updatedAt is timestamp;
+
+        allow delete: if false;
+      }
+
+      // =======================================================
+      // RAMADAN SEASONS — PERMANENT YEAR-WISE HISTORY
+      // =======================================================
+
+      match /ramadanSeasons/{seasonId} {
+
+        function validSeasonData(data) {
+          return data.keys().hasAll([
+              "hijriYear",
+              "startDate",
+              "totalDays",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.keys().hasOnly([
+              "hijriYear",
+              "startDate",
+              "totalDays",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.hijriYear is int
+            && data.hijriYear >= 1300
+            && data.hijriYear <= 1600
+            && seasonId == string(data.hijriYear)
+            && data.startDate is string
+            && data.startDate.matches(
+              '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+            )
+            && data.totalDays is int
+            && data.totalDays in [29, 30]
+            && data.createdAt is timestamp
+            && data.updatedAt is timestamp;
+        }
+
+        allow read: if request.auth != null
+          && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && validSeasonData(request.resource.data);
+
+        allow update: if request.auth != null
+          && request.auth.uid == userId
+          && validSeasonData(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              "hijriYear",
+              "startDate",
+              "totalDays",
+              "updatedAt"
+            ]);
+
+        allow delete: if request.auth != null
+          && request.auth.uid == userId;
+
+        // =====================================================
+        // DAILY FASTING RECORDS
+        // =====================================================
+
+        match /fastingDays/{dayId} {
+
+          function validFastingDay(data) {
+            return data.keys().hasAll([
+                "dayNumber",
+                "date",
+                "status",
+                "note",
+                "updatedAt"
+              ])
+              && data.keys().hasOnly([
+                "dayNumber",
+                "date",
+                "status",
+                "note",
+                "updatedAt"
+              ])
+              && data.dayNumber is int
+              && data.dayNumber >= 1
+              && data.dayNumber <= 30
+              && dayId == (
+                'day_' +
+                (data.dayNumber < 10
+                  ? '0' + string(data.dayNumber)
+                  : string(data.dayNumber))
+              )
+              && data.date is string
+              && data.date.matches(
+                '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+              )
+              && data.status in [
+                "completed",
+                "missed",
+                "exempt"
+              ]
+              && data.note is string
+              && data.note.size() <= 500
+              && data.updatedAt is timestamp;
+          }
+
+          allow read: if request.auth != null
+            && request.auth.uid == userId;
+
+          allow create, update: if request.auth != null
+            && request.auth.uid == userId
+            && validFastingDay(request.resource.data);
+
+          allow delete: if request.auth != null
+            && request.auth.uid == userId;
+        }
+      }
+
+      // =======================================================
+      // QADA OBLIGATIONS
+      // =======================================================
+
+      match /qadaObligations/{obligationId} {
+
+        function validQadaObligation(data) {
+          return data.keys().hasAll([
+              "label",
+              "sourceHijriYear",
+              "totalDays",
+              "completedDays",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.keys().hasOnly([
+              "label",
+              "sourceHijriYear",
+              "totalDays",
+              "completedDays",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.label is string
+            && data.label.size() >= 1
+            && data.label.size() <= 100
+            && (
+              data.sourceHijriYear == null ||
+              (
+                data.sourceHijriYear is int
+                && data.sourceHijriYear >= 1300
+                && data.sourceHijriYear <= 1600
+              )
+            )
+            && data.totalDays is int
+            && data.totalDays >= 1
+            && data.totalDays <= 500
+            && data.completedDays is int
+            && data.completedDays >= 0
+            && data.completedDays <= data.totalDays
+            && data.createdAt is timestamp
+            && data.updatedAt is timestamp;
+        }
+
+        allow read: if request.auth != null
+          && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && validQadaObligation(request.resource.data)
+          && request.resource.data.completedDays == 0;
+
+        allow update: if request.auth != null
+          && request.auth.uid == userId
+          && validQadaObligation(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              "label",
+              "sourceHijriYear",
+              "totalDays",
+              "completedDays",
+              "updatedAt"
+            ]);
+
+        allow delete: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      // =======================================================
+      // QURAN KHATAM GOALS
+      // =======================================================
+
+      match /quranKhatams/{khatamId} {
+
+        function validKhatam(data) {
+          return data.keys().hasAll([
+              "title",
+              "category",
+              "startDate",
+              "targetDate",
+              "targetPages",
+              "pagesRead",
+              "completedJuz",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.keys().hasOnly([
+              "title",
+              "category",
+              "startDate",
+              "targetDate",
+              "targetPages",
+              "pagesRead",
+              "completedJuz",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.title is string
+            && data.title.size() >= 1
+            && data.title.size() <= 100
+            && data.category in ["personal", "ramadan"]
+            && data.startDate is string
+            && data.startDate.matches(
+              '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+            )
+            && (
+              data.targetDate == null ||
+              (
+                data.targetDate is string
+                && data.targetDate.matches(
+                  '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                )
+                && data.targetDate >= data.startDate
+              )
+            )
+            && data.targetPages is int
+            && data.targetPages == 604
+            && data.pagesRead is int
+            && data.pagesRead >= 0
+            && data.pagesRead <= 604
+            && data.completedJuz is list
+            && data.completedJuz.size() <= 30
+            && data.createdAt is timestamp
+            && data.updatedAt is timestamp;
+        }
+
+        allow read: if request.auth != null
+          && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && validKhatam(request.resource.data)
+          && request.resource.data.pagesRead == 0
+          && request.resource.data.completedJuz.size() == 0;
+
+        allow update: if request.auth != null
+          && request.auth.uid == userId
+          && validKhatam(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              "title",
+              "category",
+              "startDate",
+              "targetDate",
+              "pagesRead",
+              "completedJuz",
+              "updatedAt"
+            ]);
+
+        allow delete: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      // =======================================================
+      // QURAN KHATAM READING HISTORY
+      // =======================================================
+
+      match /quranKhatamReadings/{readingId} {
+
+        function validKhatamReading(data) {
+          return data.keys().hasAll([
+              "khatamId",
+              "date",
+              "pagesRead",
+              "surahName",
+              "ayahStart",
+              "ayahEnd",
+              "juzNumber",
+              "note",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.keys().hasOnly([
+              "khatamId",
+              "date",
+              "pagesRead",
+              "surahName",
+              "ayahStart",
+              "ayahEnd",
+              "juzNumber",
+              "note",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.khatamId is string
+            && data.date is string
+            && data.date.matches(
+              '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+            )
+            && data.pagesRead is int
+            && data.pagesRead >= 1
+            && data.pagesRead <= 604
+            && data.surahName is string
+            && data.surahName.size() <= 100
+            && (
+              (
+                data.ayahStart == null
+                && data.ayahEnd == null
+              )
+              ||
+              (
+                data.ayahStart is int
+                && data.ayahEnd is int
+                && data.ayahStart >= 1
+                && data.ayahEnd >= data.ayahStart
+              )
+            )
+            && (
+              data.juzNumber == null ||
+              (
+                data.juzNumber is int
+                && data.juzNumber >= 1
+                && data.juzNumber <= 30
+              )
+            )
+            && data.note is string
+            && data.note.size() <= 500
+            && data.createdAt is timestamp
+            && data.updatedAt is timestamp;
+        }
+
+        allow read: if request.auth != null
+          && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && validKhatamReading(request.resource.data)
+          && exists(
+            /databases/$(database)/documents/users/$(userId)/quranKhatams/$(request.resource.data.khatamId)
+          );
+
+        allow update: if request.auth != null
+          && request.auth.uid == userId
+          && validKhatamReading(request.resource.data)
+          && request.resource.data.khatamId == resource.data.khatamId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              "date",
+              "pagesRead",
+              "surahName",
+              "ayahStart",
+              "ayahEnd",
+              "juzNumber",
+              "note",
+              "updatedAt"
+            ])
+          && exists(
+            /databases/$(database)/documents/users/$(userId)/quranKhatams/$(resource.data.khatamId)
+          );
+
+        allow delete: if request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      // =======================================================
+      // RAMADAN CHARITY DONATIONS
+      // =======================================================
+
+      match /ramadanCharityDonations/{donationId} {
+
+        function isCharityOwner() {
+          return request.auth != null
+            && request.auth.uid == userId;
+        }
+
+        function validCharityDonation() {
+          return request.resource.data.keys().hasAll([
+            "donationDate",
+            "title",
+            "amount",
+            "donationType",
+            "recipient",
+            "paymentMethod",
+            "note",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "donationDate",
+            "title",
+            "amount",
+            "donationType",
+            "recipient",
+            "paymentMethod",
+            "note",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.donationDate is string
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 80
+          && request.resource.data.amount is number
+          && request.resource.data.amount > 0
+          && request.resource.data.donationType in [
+            "sadaqah",
+            "zakat",
+            "fitr",
+            "fidya",
+            "kaffarah",
+            "iftar",
+            "mosque",
+            "other"
+          ]
+          && request.resource.data.recipient is string
+          && request.resource.data.recipient.size() <= 120
+          && request.resource.data.paymentMethod in [
+            "upi",
+            "cash",
+            "bank",
+            "card",
+            "other"
+          ]
+          && request.resource.data.note is string
+          && request.resource.data.note.size() <= 500
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.updatedAt is timestamp;
+        }
+
+        allow read: if isCharityOwner();
+
+        allow create: if isCharityOwner()
+          && validCharityDonation();
+
+        allow update: if isCharityOwner()
+          && validCharityDonation()
+          && request.resource.data.createdAt == resource.data.createdAt;
+
+        allow delete: if isCharityOwner();
+      }
+
+      // =======================================================
+      // RAMADAN PLANNER DAYS
+      // =======================================================
+
+      match /ramadanPlannerDays/{dateId} {
+
+        function isPlannerOwner() {
+          return request.auth != null
+            && request.auth.uid == userId;
+        }
+
+        function validPlannerDay(data) {
+          return dateId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && data.keys().hasAll([
+              "date",
+              "intention",
+              "notes",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.keys().hasOnly([
+              "date",
+              "intention",
+              "notes",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.date is string
+            && data.date == dateId
+            && data.intention is string
+            && data.intention.size() <= 500
+            && data.notes is string
+            && data.notes.size() <= 2000
+            && data.createdAt is timestamp
+            && data.updatedAt is timestamp;
+        }
+
+        allow read: if isPlannerOwner();
+
+        allow create: if isPlannerOwner()
+          && validPlannerDay(request.resource.data);
+
+        allow update: if isPlannerOwner()
+          && validPlannerDay(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+
+        allow delete: if isPlannerOwner();
+      }
+
+      // =======================================================
+      // RAMADAN PLANNER TASKS
+      // =======================================================
+
+      match /ramadanPlannerTasks/{taskId} {
+
+        function isPlannerOwner() {
+          return request.auth != null
+            && request.auth.uid == userId;
+        }
+
+        function validPlannerTask(data) {
+          return data.keys().hasAll([
+            "date",
+            "title",
+            "category",
+            "startTime",
+            "endTime",
+            "description",
+            "completed",
+            "createdAt",
+            "updatedAt"
+          ])
+          && data.keys().hasOnly([
+            "date",
+            "title",
+            "category",
+            "startTime",
+            "endTime",
+            "description",
+            "completed",
+            "createdAt",
+            "updatedAt"
+          ])
+          && data.date is string
+          && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && data.title is string
+          && data.title.size() > 0
+          && data.title.size() <= 100
+          && data.category in [
+            "suhoor",
+            "prayer",
+            "quran",
+            "dhikr",
+            "work",
+            "rest",
+            "iftar",
+            "taraweeh",
+            "charity",
+            "other"
+          ]
+          && data.startTime is string
+          && data.startTime.size() <= 20
+          && data.endTime is string
+          && data.endTime.size() <= 20
+          && data.description is string
+          && data.description.size() <= 500
+          && data.completed is bool
+          && data.createdAt is timestamp
+          && data.updatedAt is timestamp;
+        }
+
+        allow read: if isPlannerOwner();
+
+        allow create: if isPlannerOwner()
+          && validPlannerTask(request.resource.data);
+
+        allow update: if isPlannerOwner()
+          && validPlannerTask(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+
+        allow delete: if isPlannerOwner();
+      }
+
+      // =======================================================
+      // RAMADAN LAST TEN NIGHTS SETTINGS
+      // =======================================================
+
+      match /ramadanLastTenNightsSettings/{settingsId} {
+
+        function isOwner() {
+          return request.auth != null
+            && request.auth.uid == userId;
+        }
+
+        function validSettings() {
+          return settingsId == "settings"
+            && request.resource.data.keys().hasOnly([
+              "night21StartDate",
+              "updatedAt"
+            ])
+            && request.resource.data.keys().hasAll([
+              "night21StartDate",
+              "updatedAt"
+            ])
+            && request.resource.data.night21StartDate is string
+            && request.resource.data.night21StartDate.matches(
+              "^\\d{4}-\\d{2}-\\d{2}$"
+            )
+            && request.resource.data.updatedAt is timestamp;
+        }
+
+        allow read: if isOwner();
+
+        allow create, update: if isOwner()
+          && validSettings();
+
+        allow delete: if false;
+      }
+
+      // =======================================================
+      // RAMADAN LAST TEN NIGHTS LOGS
+      // =======================================================
+
+      match /ramadanLastTenNights/{nightId} {
+
+        function isOwner() {
+          return request.auth != null
+            && request.auth.uid == userId;
+        }
+
+        function validNightLog() {
+          return nightId in [
+            "night_21",
+            "night_22",
+            "night_23",
+            "night_24",
+            "night_25",
+            "night_26",
+            "night_27",
+            "night_28",
+            "night_29",
+            "night_30"
+          ]
+          && request.resource.data.keys().hasOnly([
+            "nightNumber",
+            "gregorianDate",
+            "completedActivities",
+            "duaAndReflection",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasAll([
+            "nightNumber",
+            "gregorianDate",
+            "completedActivities",
+            "duaAndReflection",
+            "updatedAt"
+          ])
+          && request.resource.data.nightNumber is int
+          && request.resource.data.nightNumber in [
+            21, 22, 23, 24, 25, 26, 27, 28, 29, 30
+          ]
+          && request.resource.data.gregorianDate is string
+          && request.resource.data.completedActivities is list
+          && request.resource.data.completedActivities.size() <= 8
+          && request.resource.data.duaAndReflection is string
+          && request.resource.data.duaAndReflection.size() <= 2000
+          && request.resource.data.updatedAt is timestamp;
+        }
+
+        allow read: if isOwner();
+
+        allow create, update: if isOwner()
+          && validNightLog();
+
+        allow delete: if isOwner();
+      }
+
+      // =======================================================
+      // QADA COMPLETION HISTORY
+      // =======================================================
+
+      match /qadaCompletions/{completionId} {
+
+        function validQadaCompletion(data) {
+          return data.keys().hasAll([
+              "obligationId",
+              "completedDate",
+              "note",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.keys().hasOnly([
+              "obligationId",
+              "completedDate",
+              "note",
+              "createdAt",
+              "updatedAt"
+            ])
+            && data.obligationId is string
+            && data.completedDate is string
+            && data.completedDate.matches(
+              '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+            )
+            && data.note is string
+            && data.note.size() <= 500
+            && data.createdAt is timestamp
+            && data.updatedAt is timestamp;
+        }
+
+        allow read: if request.auth != null
+          && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && validQadaCompletion(request.resource.data)
+          && exists(
+            /databases/$(database)/documents/users/$(userId)/qadaObligations/$(request.resource.data.obligationId)
+          );
+
+        allow update: if request.auth != null
+          && request.auth.uid == userId
+          && validQadaCompletion(request.resource.data)
+          && request.resource.data.obligationId == resource.data.obligationId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              "completedDate",
+              "note",
+              "updatedAt"
+            ])
+          && exists(
+            /databases/$(database)/documents/users/$(userId)/qadaObligations/$(resource.data.obligationId)
+          );
+
+        allow delete: if request.auth != null
           && request.auth.uid == userId;
       }
     }
